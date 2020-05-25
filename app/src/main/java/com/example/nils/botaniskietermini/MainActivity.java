@@ -41,7 +41,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -75,12 +77,14 @@ public class MainActivity extends AppCompatActivity {
     Button suggest2;
     Button suggest3;
 
-    public long start;
-    public long end;
+    long start;
+    long end;
 
-    public String fileText;
-    public SpellChecker speller;
-    public ArrayList<String> results = new ArrayList<>();
+    String fileText;
+    SpellChecker speller;
+    ArrayList<String> results = new ArrayList<>();
+    List<String> searchWords = new ArrayList<>();
+    String wordToCorrect;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -167,36 +171,38 @@ public class MainActivity extends AppCompatActivity {
     public void suggestButton1Clicked(View view){
         searchTranslation(suggest1.getText().toString(), false);
         hideSuggestions();
-        searchTextField.setText("");
     }
     public void suggestButton2Clicked(View view){
         searchTranslation(suggest2.getText().toString(), false);
         hideSuggestions();
-        searchTextField.setText("");
     }
     public void suggestButton3Clicked(View view){
         searchTranslation(suggest3.getText().toString(), false);
         hideSuggestions();
-        searchTextField.setText("");
     }
 
     private void searchLanguageButton(View view){
         hideSuggestions();
 
-        final ImageView ZoomImages = (ImageView) findViewById(R.id.image2);
+        final ImageView ZoomImages = findViewById(R.id.image2);
         ZoomImages.setVisibility(View.INVISIBLE);
 
-        final ImageView pikto = (ImageView) findViewById(R.id.pictogram);
+        final ImageView pikto = findViewById(R.id.pictogram);
         pikto.setVisibility(View.INVISIBLE);
         String search = searchTextField.getText().toString();
         hideKeyboard(view);
 
-        if (search.equals("")) {
-            LinearLayout child = (LinearLayout)this.findViewById(R.id.linearLayout2);
+        if(search.startsWith(" ")){
+            LinearLayout child = this.findViewById(R.id.linearLayout2);
+            fillWhenEmptyEntry(child);
+            Toast.makeText(this, "Vārds nedrīkst sākties ar atstarpi", Toast.LENGTH_SHORT).show();
+        }
+        else if (search.equals("")) {
+            LinearLayout child = this.findViewById(R.id.linearLayout2);
             fillWhenEmptyEntry(child);
             Toast.makeText(this, getResources().getText(R.string.ToastInsertTerm), Toast.LENGTH_SHORT).show();
         } else if (search.length() < 3) {
-            LinearLayout child = (LinearLayout)this.findViewById(R.id.linearLayout2);
+            LinearLayout child = this.findViewById(R.id.linearLayout2);
             fillWhenEmptyEntry(child);
             Toast.makeText(this, getResources().getText(R.string.ToastTooShort), Toast.LENGTH_SHORT).show();
         } else {
@@ -321,9 +327,9 @@ public class MainActivity extends AppCompatActivity {
 
 
                         TextView textViewForTerms = new TextView(this);
-                        SpannableString styledString = null;
+                        SpannableString styledString;
                         String record = "";
-                        if(langTerms.size()==1 || langTerms.indexOf((LangTerm) l) == langTerms.size()-1)
+                        if(langTerms.size()==1 || langTerms.indexOf(l) == langTerms.size()-1)
                             record= l.getTerm() + " " + l.getTerm_gend();
                         else
                             record = l.getTerm() + " " + l.getTerm_gend()+", ";
@@ -431,7 +437,7 @@ public class MainActivity extends AppCompatActivity {
         final String imageName = myDB.getNoteFromDB(term);
         if(allConstructionTitles.contains(imageName)) {
             final String nameOfClass[] = new String[1];
-            ImageView picto = (ImageView) findViewById(R.id.pictogram);
+            ImageView picto = findViewById(R.id.pictogram);
             picto.setVisibility(View.VISIBLE);
 
             picto.setOnClickListener(new View.OnClickListener() { //lai izsauktu klasi
@@ -509,139 +515,125 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void displaySuggestions(String words){
+        results.clear();
+
+        searchWords = Arrays.asList(words.split(" "));
+        wordToCorrect = searchWords.get(searchWords.size() - 1);
+        Log.d("CORRECTION_INFO", wordToCorrect);
+
+        start = System.currentTimeMillis();
+        results = speller.checkWord(wordToCorrect);
+        end = System.currentTimeMillis();
+
+        float search_time = (end - start) / 1000F;
+
+        DecimalFormat df = new DecimalFormat("#.#####");
+        String formatted_time = df.format(search_time);
+
+        String message = "Search lasted for " + formatted_time + " seconds";
+
+        Log.d("CORRECTION_INFO", message);
+        Log.d("CORRECTION_INFO", results.toString());
+
+        if(results.size() > 0){
+            suggest1.setText(results.get(0));
+            suggest1.setVisibility(View.VISIBLE);
+            if(results.size() > 1) {
+                suggest2.setText(results.get(1));
+                suggest2.setVisibility(View.VISIBLE);
+                if(results.size() > 2){
+                    suggest3.setText(results.get(2));
+                    suggest3.setVisibility(View.VISIBLE);
+                }
+            }
+        }
+        else{
+            Toast.makeText(this, getResources().getText(R.string.ToastNotInDB), Toast.LENGTH_SHORT).show();
+        }
+    }
+
     public void searchTranslation(final String search, boolean again) {
 
-            ArrayList<TermAndLang> allSimilarsList = new ArrayList<>();
-            ArrayList<String> allEndings = TermEndingHelper.getEndingsFromTerm(search);
-            for (String s : allEndings) {
-                allSimilarsList.addAll(myDB.getSimilars(s));
+        Log.d("CORRECTION_INFO", search);
+        
+        ArrayList<TermAndLang> allSimilarsList = new ArrayList<>();
+        ArrayList<String> allEndings = TermEndingHelper.getEndingsFromTerm(search);
+        for (String s : allEndings) {
+            allSimilarsList.addAll(myDB.getSimilars(s));
+        }
+
+        Log.d("CORRECTION_INFO", allSimilarsList.toString());
+        final ArrayList<TermAndLang> allSimilarsWithoutDuplicatesList = new ArrayList<>();
+
+        for (int i = 0; i < allSimilarsList.size(); i++) {
+            if (!allSimilarsWithoutDuplicatesList.contains(allSimilarsList.get(i))) {
+                allSimilarsWithoutDuplicatesList.add(allSimilarsList.get(i));
             }
+        }
 
-            final ArrayList<TermAndLang> allSimilarsWithoutDuplicatesList = new ArrayList<>();
+        String[] allSimArray = new String[allSimilarsWithoutDuplicatesList.size()];
 
-            for (int i = 0; i < allSimilarsList.size(); i++) {
-                if (!allSimilarsWithoutDuplicatesList.contains(allSimilarsList.get(i))) {
-                    allSimilarsWithoutDuplicatesList.add(allSimilarsList.get(i));
+        for (int i = 0; i < allSimilarsWithoutDuplicatesList.size(); i++) {
+            allSimArray[i] = allSimilarsWithoutDuplicatesList.get(i).getTerm() + "; " + allSimilarsWithoutDuplicatesList.get(i).getLang();
+        }
+
+        if (allSimArray.length > 1) {
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle(getResources().getText(R.string.entries));
+            builder.setItems(allSimArray, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+
+                    String searchInDB = allSimilarsWithoutDuplicatesList.get(which).getTerm();
+                    searchTerm = searchInDB;
+                    startSearchingForTerm(searchInDB);
                 }
-            }
-            String[] allSimArray = new String[allSimilarsWithoutDuplicatesList.size()];
+            });
 
-            for (int i = 0; i < allSimilarsWithoutDuplicatesList.size(); i++) {
-                allSimArray[i] = allSimilarsWithoutDuplicatesList.get(i).getTerm() + "; " + allSimilarsWithoutDuplicatesList.get(i).getLang();
-            }
+            AlertDialog dialog = builder.create();
+            dialog.show();
 
-            if (allSimArray.length > 1) {
-
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle(getResources().getText(R.string.entries));
-                builder.setItems(allSimArray, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-
-                        String searchInDB = allSimilarsWithoutDuplicatesList.get(which).getTerm();
-                        searchTerm = searchInDB;
-                        startSearchingForTerm(searchInDB);
-                    }
-
-                });
-
-                AlertDialog dialog = builder.create();
-                dialog.show();
-
-            } else if (allSimArray.length == 1) {
-                searchTerm = allSimilarsList.get(0).getTerm();
-
-                startSearchingForTerm(allSimilarsList.get(0).getTerm());
-            } else {
-                LinearLayout child = (LinearLayout) this.findViewById(R.id.linearLayout2);
-                fillWhenEmptyEntry(child);
-                if(!again) {
-                    final String searchUpdated = Character.isUpperCase(search.charAt(0)) ? Character.toLowerCase(search.charAt(0)) + search.substring(1) : Character.toUpperCase(search.charAt(0)) + search.substring(1);
-                    ArrayList<TermInfo> foundedTerms = myDB.getTermsFromDB(searchUpdated);
-                    if(foundedTerms.size()>0) {
-                        new AlertDialog.Builder(this).setTitle(getResources().getString(R.string.ToastIsItRightTerm))
-                                .setMessage(searchUpdated)
-                                .setPositiveButton(getResources().getString(R.string.yes),
-                                        new DialogInterface.OnClickListener() {
-                                            public void onClick(DialogInterface dialog, int which) {
-                                                searchTranslation(searchUpdated, true);
-                                                dialog.dismiss();
-                                            }
-                                        })
-                                .setNegativeButton(getResources().getString(R.string.no), new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        dialog.dismiss();
-                                    }
-                                })
-                                .create()
-                                .show();
-                    }
-                    else {
-                        Toast.makeText(this, getResources().getText(R.string.ToastNotInDB), Toast.LENGTH_SHORT).show();
-
-                        //Spell correction
-
-                        results.clear();
-
-                        start = System.currentTimeMillis();
-
-                        results = speller.checkWord(search);
-
-                        end = System.currentTimeMillis();
-                        float search_time = (end - start) / 1000F;
-                        String message = "Search lasted for " + search_time + " seconds";
-
-                        Log.d("SEARCH_INFO", message);
-
-                        Log.d("SEARCH_INFO", results.toString());
-
-                        if(results.size() > 0){
-                            suggest1.setText(results.get(0));
-                            suggest1.setVisibility(View.VISIBLE);
-                            if(results.size() > 1) {
-                                suggest2.setText(results.get(1));
-                                suggest2.setVisibility(View.VISIBLE);
-                                if(results.size() > 2){
-                                    suggest3.setText(results.get(2));
-                                    suggest3.setVisibility(View.VISIBLE);
+        } else if (allSimArray.length == 1) {
+            searchTerm = allSimilarsList.get(0).getTerm();
+            startSearchingForTerm(searchTerm);
+        } else {
+            LinearLayout child = this.findViewById(R.id.linearLayout2);
+            fillWhenEmptyEntry(child);
+            if(!again) {
+                final String searchUpdated = Character.isUpperCase(search.charAt(0)) ? Character.toLowerCase(search.charAt(0)) + search.substring(1) : Character.toUpperCase(search.charAt(0)) + search.substring(1);
+                ArrayList<TermInfo> foundedTerms = myDB.getTermsFromDB(searchUpdated);
+                if(foundedTerms.size()>0) {
+                    new AlertDialog.Builder(this).setTitle(getResources().getString(R.string.ToastIsItRightTerm))
+                        .setMessage(searchUpdated)
+                        .setPositiveButton(getResources().getString(R.string.yes),
+                            new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which) {
+                                    searchTranslation(searchUpdated, true);
+                                    dialog.dismiss();
                                 }
+                            })
+                        .setNegativeButton(getResources().getString(R.string.no), new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
                             }
-                        }
-
-                    }
+                        })
+                        .create()
+                        .show();
                 }
                 else {
-                    Toast.makeText(this, getResources().getText(R.string.ToastNotInDB), Toast.LENGTH_SHORT).show();
-
-                    //Spell correction block
-
-                    results.clear();
-                    start = System.currentTimeMillis();
-                    results = speller.checkWord(search);
-
-                    end = System.currentTimeMillis();
-                    float search_time = (end - start) / 1000F;
-                    String message = "Search lasted for " + search_time + " seconds";
-
-                    Log.d("SEARCH_INFO", message);
-
-                    Log.d("SEARCH_INFO", results.toString());
-
-                    if(results.size() > 0){
-                        suggest1.setText(results.get(0));
-                        suggest1.setVisibility(View.VISIBLE);
-                        if(results.size() > 1) {
-                            suggest2.setText(results.get(1));
-                            suggest2.setVisibility(View.VISIBLE);
-                            if(results.size() > 2){
-                                suggest3.setText(results.get(2));
-                                suggest3.setVisibility(View.VISIBLE);
-                            }
-                        }
-                    }
+                    // *** Spelling correction ***
+                    displaySuggestions(search);
                 }
             }
+            else {
+                // *** Spelling correction ***
+                Log.d("CORRECTION_INFO", "We got here");
+                displaySuggestions(search);
+            }
+        }
     }
 
     public void startSearchingForTerm(String searchTerm) {

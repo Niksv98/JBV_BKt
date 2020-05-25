@@ -3,7 +3,7 @@ package com.example.nils.botaniskietermini.Spelling;
 import java.util.ArrayList;
 
 public class SpellChecker {
-    ArrayList<String> suggestions = new ArrayList<String>();
+    ArrayList<String> suggestions = new ArrayList<>();
     Dictionary dictionary;
     BKTree tree;
 

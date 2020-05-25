@@ -68,7 +68,6 @@ class BKTree {
             if (null != ptr) {
                 getSimilarWords(nodes.get(ptr), result, search);
             }
-
             start++;
         }
     }
